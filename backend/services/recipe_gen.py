@@ -2,6 +2,7 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from models.ingredient import Ingredient
 import json
 import os
 
@@ -15,9 +16,9 @@ client = genai.Client(
     location="us-central1"
 )
 
-def generate_recipes(ingredients: list[str]):
+def generate_recipes(ingredients: list[Ingredient]):
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=[
             f"Available ingredients: {ingredients}"
         ],
@@ -26,4 +27,6 @@ def generate_recipes(ingredients: list[str]):
             temperature=0.7
         )
     )
+    with open("output/recipes.txt", "w") as f:
+        f.write(response.text)
     return json.loads(response.text)

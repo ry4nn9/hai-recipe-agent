@@ -107,7 +107,11 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
         with open("output/output.txt", "w") as f:
             f.write("\n".join([i["name"] for i in final_ingredients]))
 
-        return final_ingredients
+        return [{
+            'name': ingredient['name'],
+            'quantity': ingredient['quantity'],
+            'condition': ingredient['condition']
+        } for ingredient in final_ingredients]
 
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Error parsing recheck JSON: {e}")
