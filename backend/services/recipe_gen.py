@@ -1,23 +1,29 @@
 from pathlib import Path
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
+import json
 import os
 
-load_dotenv()
 backend_dir = Path(__file__).resolve().parent.parent
 env_path = backend_dir / ".env"
 load_dotenv(env_path)
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(
+    vertexai=True,
+    project=os.getenv("GOOGLE_CLOUD_PROJECT"),
+    location="us-central1"
+)
 
-def generate_recipes(_ingredients: list[str]):
+def generate_recipes(ingredients: list[str]):
     response = client.models.generate_content(
-        model="gemini-3-flash-preview",
+        model="gemini-2.0-flash",
         contents=[
-            f"Generate a recipe for the following ingredients: {_ingredients}"
+            f"Available ingredients: {ingredients}"
         ],
-        config=genai.types.GenerateContentConfig(
-            system_instruction=open("prompts/generate_recipes.txt").read()
+        config=types.GenerateContentConfig(
+            system_instruction=open("prompts/generate_recipes.txt").read(),
+            temperature=0.7
         )
     )
-    return response.text
+    return json.loads(response.text)

@@ -6,9 +6,3 @@ pydantic
 python-dotenv
 pytest
 python-multipart
-transformers
-torch
-pillow
-torchvision
-timm
-ultralytics
