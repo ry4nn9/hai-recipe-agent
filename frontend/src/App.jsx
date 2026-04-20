@@ -170,12 +170,14 @@ export default function App() {
         style={{ display: "none" }}
         onChange={handleImageSelect}
       />
-      <AppHeader />
-      <StageNavigation
-        stage={stage}
-        setStage={setStageWithinProgress}
-        unlockedStage={unlockedStage}
-      />
+      <div className="app-menubar">
+        <AppHeader />
+        <StageNavigation
+          stage={stage}
+          setStage={setStageWithinProgress}
+          unlockedStage={unlockedStage}
+        />
+      </div>
 
       <main className="viewport">
         <AnimatePresence mode="wait">

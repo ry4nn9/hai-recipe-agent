@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Zap } from "lucide-react";
+import { Loader2, Zap } from "lucide-react";
 import { STAGES, STAGE_COPY } from "../constants/stages";
 
 function UploadIcon() {
@@ -60,94 +60,104 @@ export default function StagePanel({
       {stage === "input" && (
         <div className="input-shell stage-content">
           <div
-            className="pill-image-frame upload-frame"
+            className={`pill-image-frame upload-frame${loadingDetect ? " upload-frame--loading" : ""}`}
             role="button"
-            tabIndex={0}
-            onClick={onPickImage}
+            tabIndex={loadingDetect ? -1 : 0}
+            aria-busy={loadingDetect}
+            aria-disabled={loadingDetect}
+            onClick={loadingDetect ? undefined : onPickImage}
             onKeyDown={(event) => {
+              if (loadingDetect) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 onPickImage();
               }
             }}
           >
-            <UploadIcon />
+            {loadingDetect ? (
+              <Loader2 className="upload-loader loader-spin" strokeWidth={1.5} aria-hidden="true" />
+            ) : (
+              <UploadIcon />
+            )}
             <p className="micro-label">IMAGE INGEST</p>
             <p className="hint-text">
-              <Zap
-                className={`processing-icon ${loadingDetect ? "icon-active" : "icon-inactive"}`}
-                strokeWidth={1.5}
-                aria-hidden="true"
-              />
               {loadingDetect
-                ? "Analyzing uploaded image..."
+                ? "Analyzing uploaded image…"
                 : fileName
                   ? `Uploaded: ${fileName}`
                   : "No file selected"}
             </p>
           </div>
-          <p className="hint-text">Detection runs automatically after upload.</p>
         </div>
       )}
 
       {stage === "synthesis" && (
         <div className="synthesis-minimal stage-content">
-          <p className="micro-label">INGREDIENTS</p>
-          <div className="ingredient-grid">
-            {ingredients.length ? (
-              ingredients.map((item, idx) => (
-                <button
-                  key={`${item.name}-${idx}`}
-                  type="button"
-                  className="ingredient-chip"
-                  onClick={() => onOpenIngredient(item, idx)}
-                >
-                  <span aria-hidden="true">◉</span>
-                  <span>{item.name}</span>
-                </button>
-              ))
-            ) : (
-              <p className="hint-text">No ingredients detected yet.</p>
-            )}
-          </div>
-          <button
-            type="button"
-            className="action-button"
-            onClick={onRunRecipes}
-            disabled={!ingredients.length || loadingRecipes}
-          >
-            <Zap
-              className={`processing-icon ${loadingRecipes ? "icon-active" : "icon-inactive"}`}
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
-            {loadingRecipes ? "Generating..." : "Generate Recipe Options"}
-          </button>
-
-          {recipes.length ? (
-            <div className="recipe-option-list stage-section">
-              <p className="micro-label">RECIPE OPTIONS</p>
-              {recipes.map((recipe, idx) => (
-                <button
-                  key={`${recipe.title}-${idx}`}
-                  type="button"
-                  className="recipe-option-card"
-                  onClick={() => onPreviewRecipe(recipe)}
-                >
-                  <span className="recipe-option-main">
-                    <span className="recipe-option-title">{recipe.title}</span>
-                    <span className="recipe-option-description">
-                      {recipe.description || "Open preview to inspect the full approach."}
-                    </span>
-                  </span>
-                  <span className="recipe-option-meta">
-                    <span>{recipe.prep_time || "Time n/a"}</span>
-                    <span>{recipe.difficulty || "Difficulty n/a"}</span>
-                  </span>
-                </button>
-              ))}
+          <div className="synthesis-columns">
+            <div className="synthesis-column synthesis-column--ingredients">
+              <p className="micro-label">INGREDIENTS</p>
+              <div className="ingredient-grid">
+                {ingredients.length ? (
+                  ingredients.map((item, idx) => (
+                    <button
+                      key={`${item.name}-${idx}`}
+                      type="button"
+                      className="ingredient-chip"
+                      onClick={() => onOpenIngredient(item, idx)}
+                    >
+                      <span aria-hidden="true">◉</span>
+                      <span>{item.name}</span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="hint-text">No ingredients detected yet.</p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="action-button synthesis-generate-btn"
+                onClick={onRunRecipes}
+                disabled={!ingredients.length || loadingRecipes}
+                aria-busy={loadingRecipes}
+              >
+                {loadingRecipes ? (
+                  <Loader2 className="processing-icon loader-spin" strokeWidth={2} aria-hidden="true" />
+                ) : (
+                  <Zap className="processing-icon icon-inactive" strokeWidth={1.5} aria-hidden="true" />
+                )}
+                {loadingRecipes ? "Generating…" : "Brainstorm"}
+              </button>
             </div>
-          ) : null}
+
+            <div className="synthesis-column synthesis-column--recipes">
+              {recipes.length ? (
+                <div className="recipe-option-list stage-section">
+                  <p className="micro-label">RECIPE IDEAS</p>
+                  {recipes.map((recipe, idx) => (
+                    <button
+                      key={`${recipe.title}-${idx}`}
+                      type="button"
+                      className="recipe-option-card"
+                      onClick={() => onPreviewRecipe(recipe)}
+                    >
+                      <span className="recipe-option-main">
+                        <span className="recipe-option-title">{recipe.title}</span>
+                      </span>
+                      <span className="recipe-option-meta">
+                        <span>{recipe.prep_time || "Time n/a"}</span>
+                        <span>{recipe.difficulty || "Difficulty n/a"}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="synthesis-recipes-empty">
+                  <p className="micro-label">RECIPE OPTIONS</p>
+                  <p className="hint-text">Generate recipes to see matches here.</p>
+                </div>
+              )}
+            </div>
+          </div>
 
           {previewRecipe ? (
             <div className="ingredient-modal-backdrop" onClick={onClosePreview}>
@@ -156,7 +166,6 @@ export default function StagePanel({
                 onClick={(event) => event.stopPropagation()}
               >
                 <header className="recipe-preview-head">
-                  <p className="micro-label">RECIPE PREVIEW</p>
                   <h3>{previewRecipe.title}</h3>
                   <p className="recipe-preview-description">{previewRecipe.description}</p>
                   <div className="recipe-preview-meta">
@@ -198,7 +207,7 @@ export default function StagePanel({
                     className="action-button action-button-primary"
                     onClick={() => onSelectRecipe(previewRecipe)}
                   >
-                    Use This Recipe
+                    Let's Cook!
                   </button>
                 </div>
               </article>
