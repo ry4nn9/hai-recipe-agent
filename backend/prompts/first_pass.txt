@@ -7,10 +7,14 @@ For each ingredient return:
 - "quantity": string — estimated amount based on what you can see in the image (e.g. "~8", "1 bunch", "half a bag"), otherwise "unknown"
 - "condition": string — one of: "fresh", "low", "unknown"
 - "confidence": string — one of: "high", "medium", "low"
-- "bounding_box": object — the normalized bounding box coordinates from the detected objects list matching this ingredient: {"xmin": float, "ymin": float, "xmax": float, "ymax": float}. If no match found, return null.
+- "bounding_box": object — normalized coordinates between 0 and 1: {"xmin": float, "ymin": float, "xmax": float, "ymax": float}
+  * If the ingredient matches something in the detected objects list, use those coordinates
+  * If the ingredient is visible in the image but NOT in the detected objects list, estimate the bounding box yourself based on where you see it in the image
+  * Only return null if you genuinely cannot locate the item in the image
 
 Rules:
 - Use the image as your primary source of truth — if the detected objects list seems wrong or incomplete, trust what you can see in the image
+- Identify ingredients that appear in the image even if they are missing from the detected objects list — the detector is imperfect
 - Standardize names to what a recipe would call them (e.g. "cherry tomatoes" not "tomatoes", "Greek yogurt" not "yogurt")
 - Deduplicate — if the same ingredient appears multiple times in the detected list, return it once with an aggregated quantity
 - If an object is not a food item, ignore it
@@ -22,5 +26,5 @@ Example output:
 [
   {"name": "eggs", "quantity": "~8", "condition": "fresh", "confidence": "high", "bounding_box": {"xmin": 0.1, "ymin": 0.2, "xmax": 0.4, "ymax": 0.5}},
   {"name": "cheddar cheese", "quantity": "1 block", "condition": "fresh", "confidence": "medium", "bounding_box": {"xmin": 0.5, "ymin": 0.1, "xmax": 0.8, "ymax": 0.4}},
-  {"name": "butter", "quantity": "unknown", "condition": "unknown", "confidence": "low", "bounding_box": null}
+  {"name": "butter", "quantity": "unknown", "condition": "unknown", "confidence": "low", "bounding_box": {"xmin": 0.6, "ymin": 0.7, "xmax": 0.9, "ymax": 0.95}}
 ]

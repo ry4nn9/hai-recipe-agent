@@ -6,3 +6,7 @@ pydantic
 python-dotenv
 pytest
 python-multipart
+ultralytics
+opencv-python
+numpy
+sahi

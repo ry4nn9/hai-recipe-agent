@@ -1,18 +1,24 @@
+import base64
 import io
 import json
-from google.cloud.vision_v1 import ImageAnnotatorClient
-from google.cloud.vision_v1.types import Image
+from sahi import AutoDetectionModel
+from sahi.predict import get_sliced_prediction
 from PIL import Image as PILImage
 from google import genai
 from google.genai import types
 from fastapi import UploadFile, File, HTTPException
 from dotenv import load_dotenv
 import os
-from services.image_utils import preprocess_image, crop_image
+from services.image_utils import preprocess_image, crop_image, draw_bounding_boxes
 
 load_dotenv("../.env")
 
-vision_client = ImageAnnotatorClient()
+detection_model = AutoDetectionModel.from_pretrained(
+    model_type="ultralytics",
+    model_path="yolov8x.pt",
+    confidence_threshold=0.1,
+)
+
 gemini_client = genai.Client(
     vertexai=True,
     project=os.getenv("GOOGLE_CLOUD_PROJECT"),
@@ -23,7 +29,7 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
     # Read the image file
     try:
         image_bytes = await image_file.read()
-        image = Image(content=image_bytes)
+        image_bytes = preprocess_image(image_bytes)
         pil_image = PILImage.open(io.BytesIO(image_bytes))
         img_width, img_height = pil_image.size
     except Exception as e:
@@ -32,17 +38,30 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
     # Detect objects in the image
     # Create bounding boxes
     try:
-        objects = vision_client.object_localization(image=image).localized_object_annotations
-        objects_data = [{
-            "name": object.name,
-            "score": object.score,
-            "box": {
-                "xmin": object.bounding_poly.normalized_vertices[0].x,
-                "ymin": object.bounding_poly.normalized_vertices[0].y,
-                "xmax": object.bounding_poly.normalized_vertices[2].x,
-                "ymax": object.bounding_poly.normalized_vertices[2].y
-            }
-        } for object in objects]
+        results = get_sliced_prediction(
+            pil_image,
+            detection_model,
+            slice_height=240,
+            slice_width=240,
+            overlap_height_ratio=0.2,
+            overlap_width_ratio=0.2,
+        )
+
+        results.export_visuals(export_dir="output/", file_name="sahi_annotated")
+
+        objects_data = []
+        for object in results.object_prediction_list:
+            bounding_box = object.bbox
+            objects_data.append({
+                "name": object.category.name,
+                "score": round(object.score.value, 3),
+                "box": {
+                    "xmin": bounding_box.minx / img_width,
+                    "ymin": bounding_box.miny / img_height,
+                    "xmax": bounding_box.maxx / img_width,
+                    "ymax": bounding_box.maxy / img_height
+                }
+            })
 
         print(f"Detected objects: {objects_data}")
     except Exception as e:
@@ -56,7 +75,7 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
             model="gemini-2.5-flash",
             contents=[
                 types.Part.from_bytes(data=image_processed, mime_type="image/jpeg"),
-                f"Detected objects: {objects_data}"
+                types.Part.from_text(text=f"Detected objects: {json.dumps(objects_data)}"),
             ],
             config=types.GenerateContentConfig(
                 system_instruction=open("prompts/first_pass.txt").read(),
@@ -64,6 +83,10 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
         )
 
         ingredients = json.loads(response.text)
+
+        print("First pass completed.")
+
+        print(f"First pass response: {response.text}")
 
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Error parsing JSON: {e}")
@@ -73,6 +96,7 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
     # Revisit for low confidence objects (second pass)
     contents = []
     final_ingredients = [i for i in ingredients if i.get("confidence") == "high"]
+
     low_confidence_objects = [i for i in ingredients if i.get("confidence") != "high"]
 
     try:
@@ -86,7 +110,9 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
             else:
                 contents.append(types.Part.from_bytes(data=image_processed, mime_type="image/jpeg"))
 
-            contents.append(f"Initial detection: {obj}")
+            contents.append(
+                types.Part.from_text(text=f"Initial detection: {json.dumps(obj)}")
+            )
 
         if contents:
             response = gemini_client.models.generate_content(
@@ -97,6 +123,8 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
                 )
             )
 
+            print(f"Second pass response: {response.text}")
+
             rechecked_ingredients = json.loads(response.text)
 
             if not isinstance(rechecked_ingredients, list):
@@ -104,14 +132,26 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
 
             final_ingredients.extend(rechecked_ingredients)
 
+        print(f"Final ingredients: {final_ingredients}")
+        print("Second pass completed.")
+
+        annotated_image = draw_bounding_boxes(image_bytes, final_ingredients, img_width, img_height)
+
         with open("output/output.txt", "w") as f:
             f.write("\n".join([i["name"] for i in final_ingredients]))
 
-        return [{
-            'name': ingredient['name'],
-            'quantity': ingredient['quantity'],
-            'condition': ingredient['condition']
-        } for ingredient in final_ingredients]
+        with open("output/annotated_image.jpg", "wb") as f:
+            f.write(base64.b64decode(annotated_image))
+
+        return {
+            'image': annotated_image,
+            'ingredients': [
+                {
+                'name': ingredient['name'],
+                'quantity': ingredient['quantity'],
+                'condition': ingredient['condition']
+                } 
+            for ingredient in final_ingredients]}
 
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Error parsing recheck JSON: {e}")

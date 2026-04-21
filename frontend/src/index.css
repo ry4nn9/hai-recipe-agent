@@ -240,6 +240,11 @@ body {
   transform: translateY(0);
 }
 
+.motion-stage-pill:not(:disabled):hover,
+.motion-stage-pill:not(:disabled):active {
+  transform: none;
+}
+
 .stage-pill:disabled {
   opacity: 0.42;
   cursor: not-allowed;
@@ -315,6 +320,29 @@ body {
 .input-shell {
   display: grid;
   gap: var(--space-md);
+}
+
+.synthesis-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.synthesis-column--ingredients .synthesis-panel-section + .synthesis-panel-section {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--line);
+}
+
+.synthesis-section-hint {
+  margin: 0;
+  text-align: left;
+  line-height: 1.45;
+}
+
+.synthesis-preview-open-btn,
+.synthesis-add-ingredient-btn {
+  align-self: flex-start;
 }
 
 .synthesis-columns {
@@ -408,6 +436,11 @@ body {
   transform: translateY(0);
 }
 
+.motion-upload-frame:not(.upload-frame--loading):hover,
+.motion-upload-frame:not(.upload-frame--loading):active {
+  transform: none;
+}
+
 .upload-frame:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -494,6 +527,12 @@ body {
   transform: translateY(0);
 }
 
+/* Framer Motion drives transform on these — avoid fighting CSS */
+.motion-button.action-button:hover:not(:disabled),
+.motion-button.action-button:active:not(:disabled) {
+  transform: none;
+}
+
 .action-button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -514,6 +553,17 @@ body {
 
 .action-button-secondary {
   background: var(--surface);
+}
+
+.action-button-danger {
+  border-color: rgba(185, 28, 28, 0.35);
+  background: rgba(254, 242, 242, 0.6);
+  color: #991b1b;
+}
+
+.action-button-danger:hover:not(:disabled) {
+  border-color: rgba(185, 28, 28, 0.55);
+  background: rgba(254, 226, 226, 0.85);
 }
 
 .action-button:disabled {
@@ -579,6 +629,11 @@ body {
   transform: translateY(0);
 }
 
+.motion-ingredient-chip:hover,
+.motion-ingredient-chip:active {
+  transform: none;
+}
+
 .recipe-option-list {
   display: grid;
   gap: 0.55rem;
@@ -626,6 +681,11 @@ body {
 
 .recipe-option-card:active {
   transform: translateY(0);
+}
+
+.motion-recipe-card:hover,
+.motion-recipe-card:active {
+  transform: none;
 }
 
 .recipe-option-card:focus-visible,
@@ -686,6 +746,33 @@ body {
   display: grid;
   gap: 0.6rem;
   box-shadow: var(--shadow-lift);
+}
+
+.ingredient-modal.detection-preview-modal {
+  max-width: min(75vw, 1680px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.detection-preview-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-soft);
+  background: var(--surface);
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(94vh, 1400px);
+}
+
+.detection-preview-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(94vh, 1400px);
+  object-fit: contain;
+  vertical-align: middle;
 }
 
 .recipe-preview-card {
@@ -767,6 +854,17 @@ body {
   letter-spacing: 0;
   text-transform: none;
   padding: 0.55rem 0.95rem;
+}
+
+.ingredient-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
 }
 
 .ingredient-modal p,

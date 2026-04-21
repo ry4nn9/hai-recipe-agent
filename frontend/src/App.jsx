@@ -25,6 +25,8 @@ export default function App() {
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
   const [error, setError] = useState("");
+  /** Base64 JPEG from /detect/ (bounding boxes); shown in phase 2 */
+  const [annotatedImageBase64, setAnnotatedImageBase64] = useState(null);
   const fileInputRef = useRef(null);
   const chatStackRef = useRef(null);
 
@@ -48,22 +50,65 @@ export default function App() {
     setChatMessages([]);
     setChatInput("");
     setError("");
+    setAnnotatedImageBase64(null);
     setStage("input");
     setUnlockedStage(0);
     runDetect(file);
   };
 
   const handleOpenIngredient = (item, index) => {
-    setActiveIngredient({ ...item, index });
+    setActiveIngredient({ ...item, index, isNew: false });
+  };
+
+  const handleOpenAddIngredient = () => {
+    setActiveIngredient({
+      name: "",
+      quantity: "",
+      condition: "unknown",
+      index: -1,
+      isNew: true,
+    });
   };
 
   const handleEditIngredientField = (index, field, value) => {
-    setIngredients((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-    );
-    setActiveIngredient((prev) =>
-      prev && prev.index === index ? { ...prev, [field]: value } : prev
-    );
+    setActiveIngredient((prev) => {
+      if (!prev) return prev;
+      if (prev.isNew || index === -1) {
+        return { ...prev, [field]: value };
+      }
+      if (prev.index === index) {
+        return { ...prev, [field]: value };
+      }
+      return prev;
+    });
+    if (typeof index === "number" && index >= 0) {
+      setIngredients((prev) =>
+        prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+      );
+    }
+  };
+
+  const handleSaveNewIngredient = () => {
+    setActiveIngredient((current) => {
+      if (!current?.isNew) return current;
+      const name = current.name?.trim();
+      if (!name) return current;
+      setIngredients((prev) => [
+        ...prev,
+        {
+          name,
+          quantity: (current.quantity || "").trim(),
+          condition: current.condition || "unknown",
+        },
+      ]);
+      return null;
+    });
+  };
+
+  const handleDeleteIngredient = (index) => {
+    if (index < 0) return;
+    setIngredients((prev) => prev.filter((_, i) => i !== index));
+    setActiveIngredient(null);
   };
 
   const runDetect = async (fileOverride) => {
@@ -73,7 +118,18 @@ export default function App() {
     setError("");
     try {
       const detected = await pantryApi.detectIngredients(file);
-      setIngredients(Array.isArray(detected) ? detected : []);
+      // API returns { image, ingredients } from /detect/; support a bare array too
+      const list = Array.isArray(detected)
+        ? detected
+        : Array.isArray(detected?.ingredients)
+          ? detected.ingredients
+          : [];
+      setIngredients(list);
+      setAnnotatedImageBase64(
+        detected && typeof detected === "object" && typeof detected.image === "string"
+          ? detected.image
+          : null
+      );
       setUnlockedStage(1);
       setStage("synthesis");
     } catch (e) {
@@ -185,6 +241,7 @@ export default function App() {
             stage={stage}
             fileName={selectedImage?.name}
             ingredients={ingredients}
+            annotatedImageBase64={annotatedImageBase64}
             recipes={recipes}
             previewRecipe={previewRecipe}
             selectedRecipe={selectedRecipe}
@@ -201,7 +258,10 @@ export default function App() {
             onPreviewRecipe={setPreviewRecipe}
             onClosePreview={() => setPreviewRecipe(null)}
             onOpenIngredient={handleOpenIngredient}
+            onOpenAddIngredient={handleOpenAddIngredient}
             onCloseIngredient={() => setActiveIngredient(null)}
+            onSaveNewIngredient={handleSaveNewIngredient}
+            onDeleteIngredient={handleDeleteIngredient}
             onEditIngredientField={handleEditIngredientField}
             onChatInputChange={(e) => setChatInput(e.target.value)}
             onSendChat={handleSendChat}
