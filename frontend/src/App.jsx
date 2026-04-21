@@ -117,7 +117,7 @@ export default function App() {
     const file = fileOverride || selectedImage;
     if (!file) return;
     setLoadingDetect(true);
-    setDetectionProgress({ stage: "reading", message: "Sending image…" });
+    setDetectionProgress({ stage: "reading", message: "Reading image..." });
     setError("");
     try {
       const detected = await pantryApi.detectIngredientsStream(file, (ev) => {
@@ -226,53 +226,55 @@ export default function App() {
         style={{ display: "none" }}
         onChange={handleImageSelect}
       />
-      <div className="app-menubar">
-        <AppHeader />
-        <StageNavigation
-          stage={stage}
-          setStage={setStageWithinProgress}
-          unlockedStage={unlockedStage}
-        />
-      </div>
-
-      <main className="viewport">
-        <AnimatePresence mode="wait">
-          <StagePanel
+      <div className="app-canvas">
+        <div className="app-menubar">
+          <AppHeader />
+          <StageNavigation
             stage={stage}
-            fileName={selectedImage?.name}
-            ingredients={ingredients}
-            annotatedImageBase64={annotatedImageBase64}
-            recipes={recipes}
-            previewRecipe={previewRecipe}
-            selectedRecipe={selectedRecipe}
-            chatMessages={chatMessages}
-            chatInput={chatInput}
-            activeIngredient={activeIngredient}
-            loadingDetect={loadingDetect}
-            detectionProgress={detectionProgress}
-            loadingRecipes={loadingRecipes}
-            loadingChat={loadingChat}
-            error={error}
-            onPickImage={handlePickImage}
-            onRunRecipes={runRecipes}
-            onSelectRecipe={handleSelectRecipe}
-            onPreviewRecipe={setPreviewRecipe}
-            onClosePreview={() => setPreviewRecipe(null)}
-            onOpenIngredient={handleOpenIngredient}
-            onOpenAddIngredient={handleOpenAddIngredient}
-            onCloseIngredient={() => setActiveIngredient(null)}
-            onSaveNewIngredient={handleSaveNewIngredient}
-            onDeleteIngredient={handleDeleteIngredient}
-            onEditIngredientField={handleEditIngredientField}
-            onChatInputChange={(e) => setChatInput(e.target.value)}
-            onSendChat={handleSendChat}
-            chatStackRef={chatStackRef}
+            setStage={setStageWithinProgress}
+            unlockedStage={unlockedStage}
           />
-        </AnimatePresence>
-        {false && showSidebar && (
-          <DiagnosticSidebar selectedRecipe={selectedRecipe} materials={materials} />
-        )}
-      </main>
+        </div>
+
+        <main className="viewport">
+          <AnimatePresence mode="wait">
+            <StagePanel
+              stage={stage}
+              fileName={selectedImage?.name}
+              ingredients={ingredients}
+              annotatedImageBase64={annotatedImageBase64}
+              recipes={recipes}
+              previewRecipe={previewRecipe}
+              selectedRecipe={selectedRecipe}
+              chatMessages={chatMessages}
+              chatInput={chatInput}
+              activeIngredient={activeIngredient}
+              loadingDetect={loadingDetect}
+              detectionProgress={detectionProgress}
+              loadingRecipes={loadingRecipes}
+              loadingChat={loadingChat}
+              error={error}
+              onPickImage={handlePickImage}
+              onRunRecipes={runRecipes}
+              onSelectRecipe={handleSelectRecipe}
+              onPreviewRecipe={setPreviewRecipe}
+              onClosePreview={() => setPreviewRecipe(null)}
+              onOpenIngredient={handleOpenIngredient}
+              onOpenAddIngredient={handleOpenAddIngredient}
+              onCloseIngredient={() => setActiveIngredient(null)}
+              onSaveNewIngredient={handleSaveNewIngredient}
+              onDeleteIngredient={handleDeleteIngredient}
+              onEditIngredientField={handleEditIngredientField}
+              onChatInputChange={(e) => setChatInput(e.target.value)}
+              onSendChat={handleSendChat}
+              chatStackRef={chatStackRef}
+            />
+          </AnimatePresence>
+          {false && showSidebar && (
+            <DiagnosticSidebar selectedRecipe={selectedRecipe} materials={materials} />
+          )}
+        </main>
+      </div>
     </div>
   );
 }

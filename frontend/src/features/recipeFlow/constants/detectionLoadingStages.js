@@ -13,17 +13,6 @@ const SERVER_STAGE_TO_UI_INDEX = {
   done: 4,
 };
 
-const SERVER_STAGE_TITLES = {
-  reading: "Preparing image",
-  detecting: "Scanning the frame",
-  detected: "Objects located",
-  first_pass: "Mapping to ingredients",
-  first_pass_completed: "Ingredients identified",
-  second_pass: "Refining uncertain items",
-  second_pass_completed: "Drawing the preview",
-  done: "Complete",
-};
-
 /** How many UI steps the progress bar uses (matches dot count). */
 export const DETECTION_UI_STEP_COUNT = 5;
 
@@ -32,11 +21,4 @@ export function serverStageToUiIndex(stageKey) {
     return SERVER_STAGE_TO_UI_INDEX[stageKey];
   }
   return 0;
-}
-
-export function titleForServerStage(stageKey) {
-  if (stageKey != null && Object.prototype.hasOwnProperty.call(SERVER_STAGE_TITLES, stageKey)) {
-    return SERVER_STAGE_TITLES[stageKey];
-  }
-  return "Working…";
 }

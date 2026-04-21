@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, Loader2, Plus, Trash2, Zap } from "lucide-react";
 import MotionButton from "../../../components/MotionButton.jsx";
-import {
-  DETECTION_UI_STEP_COUNT,
-  serverStageToUiIndex,
-  titleForServerStage,
-} from "../constants/detectionLoadingStages";
+import { DETECTION_UI_STEP_COUNT, serverStageToUiIndex } from "../constants/detectionLoadingStages";
 import { STAGES, STAGE_COPY } from "../constants/stages";
 
 const chipSpring = { type: "spring", stiffness: 480, damping: 26 };
@@ -66,11 +62,8 @@ export default function StagePanel({
     loadingDetect && detectionProgress
       ? serverStageToUiIndex(detectionProgress.stage)
       : 0;
-  const detectTitle =
-    loadingDetect && detectionProgress
-      ? titleForServerStage(detectionProgress.stage)
-      : "";
-  const detectHint =
+  /** Same string as the stream event `message` field (see vision.py). */
+  const detectStageMessage =
     loadingDetect && detectionProgress ? detectionProgress.message : "";
 
   const content = STAGE_COPY[stage];
@@ -162,15 +155,14 @@ export default function StagePanel({
                 </div>
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={detectionProgress?.stage ?? "loading"}
+                    key={`${detectionProgress?.stage ?? "loading"}-${detectStageMessage}`}
                     className="detection-loading-copy"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={detectStageTransition}
                   >
-                    <p className="detection-loading-title">{detectTitle}</p>
-                    <p className="detection-loading-hint">{detectHint}</p>
+                    <p className="detection-loading-title">{detectStageMessage}</p>
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -182,78 +174,6 @@ export default function StagePanel({
       {stage === "synthesis" && (
         <div className="synthesis-minimal stage-content">
           <div className="synthesis-columns">
-            <div className="synthesis-column synthesis-column--ingredients">
-              <section className="synthesis-panel-section" aria-labelledby="synthesis-ingredients-heading">
-                <p className="micro-label" id="synthesis-ingredients-heading">
-                  INGREDIENTS
-                </p>
-                <div className="ingredient-grid">
-                  {ingredients.length ? (
-                    ingredients.map((item, idx) => (
-                      <motion.button
-                        key={`${item.name}-${idx}`}
-                        type="button"
-                        className="ingredient-chip motion-ingredient-chip"
-                        onClick={() => onOpenIngredient(item, idx)}
-                        whileHover={{ scale: 1.05, y: -2 }}
-                        whileTap={{ scale: 0.96 }}
-                        transition={chipSpring}
-                      >
-                        <span aria-hidden="true">◉</span>
-                        <span>{item.name}</span>
-                      </motion.button>
-                    ))
-                  ) : (
-                    <p className="hint-text">No ingredients detected yet.</p>
-                  )}
-                </div>
-                <MotionButton
-                  type="button"
-                  className="action-button action-button-secondary synthesis-add-ingredient-btn"
-                  onClick={onOpenAddIngredient}
-                >
-                  <Plus className="processing-icon" strokeWidth={1.5} aria-hidden="true" />
-                  Add ingredient
-                </MotionButton>
-              </section>
-
-              {annotatedImageBase64 ? (
-                <section className="synthesis-panel-section" aria-labelledby="synthesis-detection-heading">
-                  <p className="micro-label" id="synthesis-detection-heading">
-                    DETECTION
-                  </p>
-                  <p className="hint-text synthesis-section-hint">
-                    Open the annotated image to see how items were located on your photo.
-                  </p>
-                  <MotionButton
-                    type="button"
-                    className="action-button action-button-secondary synthesis-preview-open-btn"
-                    onClick={() => setDetectionPreviewOpen(true)}
-                  >
-                    <Eye className="processing-icon" strokeWidth={1.5} aria-hidden="true" />
-                    View detection preview
-                  </MotionButton>
-                </section>
-              ) : null}
-
-              <section className="synthesis-panel-section synthesis-panel-section--brainstorm">
-                <MotionButton
-                  type="button"
-                  className="action-button synthesis-generate-btn"
-                  onClick={onRunRecipes}
-                  disabled={!ingredients.length || loadingRecipes}
-                  aria-busy={loadingRecipes}
-                >
-                  {loadingRecipes ? (
-                    <Loader2 className="processing-icon loader-spin" strokeWidth={2} aria-hidden="true" />
-                  ) : (
-                    <Zap className="processing-icon icon-inactive" strokeWidth={1.5} aria-hidden="true" />
-                  )}
-                  {loadingRecipes ? "Generating…" : "Brainstorm"}
-                </MotionButton>
-              </section>
-            </div>
-
             <div className="synthesis-column synthesis-column--recipes">
               <section className="synthesis-panel-section synthesis-panel-section--recipes">
                 {recipes.length ? (
@@ -285,6 +205,77 @@ export default function StagePanel({
                     <p className="hint-text">Generate recipes to see matches here.</p>
                   </div>
                 )}
+              </section>
+
+              {annotatedImageBase64 ? (
+                <section className="synthesis-panel-section" aria-labelledby="synthesis-detection-heading">
+                  <p className="micro-label" id="synthesis-detection-heading">
+                    DETECTION
+                  </p>
+                  <p className="hint-text synthesis-section-hint">
+                    Open the annotated image to see how items were located on your photo.
+                  </p>
+                  <MotionButton
+                    type="button"
+                    className="action-button action-button-secondary synthesis-preview-open-btn"
+                    onClick={() => setDetectionPreviewOpen(true)}
+                  >
+                    <Eye className="processing-icon" strokeWidth={1.5} aria-hidden="true" />
+                    View detection preview
+                  </MotionButton>
+                </section>
+              ) : null}
+            </div>
+
+            <div className="synthesis-column synthesis-column--ingredients">
+              <section className="synthesis-panel-section" aria-labelledby="synthesis-ingredients-heading">
+                <p className="micro-label" id="synthesis-ingredients-heading">
+                  INGREDIENTS
+                </p>
+                <div className="ingredient-grid">
+                  {ingredients.length ? (
+                    ingredients.map((item, idx) => (
+                      <motion.button
+                        key={`${item.name}-${idx}`}
+                        type="button"
+                        className="ingredient-chip motion-ingredient-chip"
+                        onClick={() => onOpenIngredient(item, idx)}
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.96 }}
+                        transition={chipSpring}
+                      >
+                        <span aria-hidden="true">◉</span>
+                        <span>{item.name}</span>
+                      </motion.button>
+                    ))
+                  ) : (
+                    <p className="hint-text">No ingredients detected yet.</p>
+                  )}
+                </div>
+                <div className="synthesis-ingredient-actions">
+                  <MotionButton
+                    type="button"
+                    className="action-button action-button-secondary synthesis-add-ingredient-btn"
+                    onClick={onOpenAddIngredient}
+                  >
+                    <Plus className="processing-icon" strokeWidth={1.5} aria-hidden="true" />
+                    Add ingredient
+                  </MotionButton>
+                  <MotionButton
+                    type="button"
+                    className="action-button synthesis-generate-btn"
+                    onClick={onRunRecipes}
+                    disabled={!ingredients.length || loadingRecipes}
+                    aria-busy={loadingRecipes}
+                  >
+                    {loadingRecipes ? (
+                      <Loader2 className="processing-icon loader-spin" strokeWidth={2} aria-hidden="true" />
+                    ) : (
+                      <Zap className="processing-icon icon-inactive" strokeWidth={1.5} aria-hidden="true" />
+                    )}
+                    {loadingRecipes ? "Generating…" : "Brainstorm"}
+                  </MotionButton>
+                </div>
               </section>
             </div>
           </div>
