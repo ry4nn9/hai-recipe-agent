@@ -2,11 +2,17 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, Loader2, Plus, Trash2, Zap } from "lucide-react";
 import MotionButton from "../../../components/MotionButton.jsx";
+import {
+  DETECTION_UI_STEP_COUNT,
+  serverStageToUiIndex,
+  titleForServerStage,
+} from "../constants/detectionLoadingStages";
 import { STAGES, STAGE_COPY } from "../constants/stages";
 
 const chipSpring = { type: "spring", stiffness: 480, damping: 26 };
 const modalBackdropTransition = { duration: 0.22, ease: [0.22, 1, 0.36, 1] };
 const modalPanelSpring = { type: "spring", stiffness: 380, damping: 32 };
+const detectStageTransition = { duration: 0.35, ease: [0.22, 1, 0.36, 1] };
 
 function UploadIcon() {
   return (
@@ -30,6 +36,7 @@ export default function StagePanel({
   chatInput,
   activeIngredient,
   loadingDetect,
+  detectionProgress,
   loadingRecipes,
   loadingChat,
   error,
@@ -54,6 +61,17 @@ export default function StagePanel({
   useEffect(() => {
     if (!annotatedImageBase64) setDetectionPreviewOpen(false);
   }, [annotatedImageBase64]);
+
+  const detectUiStep =
+    loadingDetect && detectionProgress
+      ? serverStageToUiIndex(detectionProgress.stage)
+      : 0;
+  const detectTitle =
+    loadingDetect && detectionProgress
+      ? titleForServerStage(detectionProgress.stage)
+      : "";
+  const detectHint =
+    loadingDetect && detectionProgress ? detectionProgress.message : "";
 
   const content = STAGE_COPY[stage];
   const phaseNumber = STAGES.findIndex((stageItem) => stageItem.id === stage) + 1;
@@ -96,18 +114,67 @@ export default function StagePanel({
             transition={{ type: "spring", stiffness: 400, damping: 28 }}
           >
             {loadingDetect ? (
-              <Loader2 className="upload-loader loader-spin" strokeWidth={1.5} aria-hidden="true" />
+              <motion.div
+                className="detection-loading-icon-wrap"
+                initial={{ scale: 0.85, opacity: 0.6 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 320, damping: 22 }}
+              >
+                <Loader2 className="upload-loader loader-spin" strokeWidth={1.5} aria-hidden="true" />
+              </motion.div>
             ) : (
               <UploadIcon />
             )}
             <p className="micro-label">IMAGE INGEST</p>
             <p className="hint-text">
               {loadingDetect
-                ? "Analyzing uploaded image…"
+                ? "Pipeline running on the server…"
                 : fileName
                   ? `Uploaded: ${fileName}`
                   : "No file selected"}
             </p>
+            {loadingDetect ? (
+              <div className="detection-loading-strip" aria-live="polite" aria-atomic="true">
+                <div className="detection-loading-progress-track">
+                  <motion.div
+                    className="detection-loading-progress-fill"
+                    initial={{ scaleX: 1 / DETECTION_UI_STEP_COUNT }}
+                    animate={{
+                      scaleX: (detectUiStep + 1) / DETECTION_UI_STEP_COUNT,
+                    }}
+                    transition={{ type: "spring", stiffness: 200, damping: 26 }}
+                    style={{ transformOrigin: "left center" }}
+                  />
+                </div>
+                <div className="detection-loading-dots" aria-hidden="true">
+                  {Array.from({ length: DETECTION_UI_STEP_COUNT }, (_, i) => (
+                    <motion.span
+                      key={i}
+                      className={`detection-stage-dot${i <= detectUiStep ? " detection-stage-dot--done" : ""}${i === detectUiStep ? " detection-stage-dot--active" : ""}`}
+                      initial={false}
+                      animate={{
+                        scale: i === detectUiStep ? 1.15 : i < detectUiStep ? 1 : 0.92,
+                        opacity: i <= detectUiStep ? 1 : 0.35,
+                      }}
+                      transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                    />
+                  ))}
+                </div>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={detectionProgress?.stage ?? "loading"}
+                    className="detection-loading-copy"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={detectStageTransition}
+                  >
+                    <p className="detection-loading-title">{detectTitle}</p>
+                    <p className="detection-loading-hint">{detectHint}</p>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            ) : null}
           </motion.div>
         </div>
       )}

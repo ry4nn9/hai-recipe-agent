@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File
+from fastapi.responses import StreamingResponse
 from services.vision import detect_ingredients_from_image
 import json
 
@@ -6,5 +7,7 @@ router = APIRouter()
 
 @router.post("/")
 async def detect_ingredients(image_file: UploadFile = File(...)):
-    ingredients = await detect_ingredients_from_image(image_file)
-    return ingredients
+    async def event_stream():
+        async for event in detect_ingredients_from_image(image_file):
+            yield f"data: {json.dumps(event)}\n\n"
+    return StreamingResponse(event_stream(), media_type="text/event-stream")

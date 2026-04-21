@@ -27,6 +27,8 @@ export default function App() {
   const [error, setError] = useState("");
   /** Base64 JPEG from /detect/ (bounding boxes); shown in phase 2 */
   const [annotatedImageBase64, setAnnotatedImageBase64] = useState(null);
+  /** Latest SSE event from /detect/ while loading */
+  const [detectionProgress, setDetectionProgress] = useState(null);
   const fileInputRef = useRef(null);
   const chatStackRef = useRef(null);
 
@@ -115,20 +117,17 @@ export default function App() {
     const file = fileOverride || selectedImage;
     if (!file) return;
     setLoadingDetect(true);
+    setDetectionProgress({ stage: "reading", message: "Sending image…" });
     setError("");
     try {
-      const detected = await pantryApi.detectIngredients(file);
-      // API returns { image, ingredients } from /detect/; support a bare array too
-      const list = Array.isArray(detected)
-        ? detected
-        : Array.isArray(detected?.ingredients)
-          ? detected.ingredients
-          : [];
+      const detected = await pantryApi.detectIngredientsStream(file, (ev) => {
+        if (ev.stage === "done") return;
+        setDetectionProgress({ stage: ev.stage, message: ev.message ?? "" });
+      });
+      const list = Array.isArray(detected?.ingredients) ? detected.ingredients : [];
       setIngredients(list);
       setAnnotatedImageBase64(
-        detected && typeof detected === "object" && typeof detected.image === "string"
-          ? detected.image
-          : null
+        typeof detected?.image === "string" ? detected.image : null
       );
       setUnlockedStage(1);
       setStage("synthesis");
@@ -136,6 +135,7 @@ export default function App() {
       setError(`Detection failed: ${e.message}`);
     } finally {
       setLoadingDetect(false);
+      setDetectionProgress(null);
     }
   };
 
@@ -249,6 +249,7 @@ export default function App() {
             chatInput={chatInput}
             activeIngredient={activeIngredient}
             loadingDetect={loadingDetect}
+            detectionProgress={detectionProgress}
             loadingRecipes={loadingRecipes}
             loadingChat={loadingChat}
             error={error}

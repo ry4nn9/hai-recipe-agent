@@ -32,12 +32,15 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
         image_bytes = preprocess_image(image_bytes)
         pil_image = PILImage.open(io.BytesIO(image_bytes))
         img_width, img_height = pil_image.size
+        yield {"stage": "reading", "message": "Reading image..."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading image: {e}")
+        yield {"stage": "error", "message": f"Error reading image: {e}"}
+        return
 
     # Detect objects in the image
     # Create bounding boxes
     try:
+        yield {"stage": "detecting", "message": "Running object detection..."}
         results = get_sliced_prediction(
             pil_image,
             detection_model,
@@ -63,12 +66,15 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
                 }
             })
 
-        print(f"Detected objects: {objects_data}")
+        yield {"stage": "detected", "message": f"Found {len(objects_data)} objects."}
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error detecting objects: {e}")
+        yield {"stage": "error", "message": f"Error detecting objects: {e}"}
+        return
 
     # Generate content using Gemini (first pass)
     try:
+        yield {"stage": "first_pass", "message": "Identifying ingredients..."}
         image_processed = preprocess_image(image_bytes)
 
         response = gemini_client.models.generate_content(
@@ -84,14 +90,14 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
 
         ingredients = json.loads(response.text)
 
-        print("First pass completed.")
-
-        print(f"First pass response: {response.text}")
+        yield {"stage": "first_pass_completed", "message": f"Identified {len(ingredients)} ingredients."}
 
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Error parsing JSON: {e}")
+        yield {"stage": "error", "message": f"Error parsing JSON: {e}"}
+        return
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
+        yield {"stage": "error", "message": f"Error generating content: {e}"}
+        return
 
     # Revisit for low confidence objects (second pass)
     contents = []
@@ -100,6 +106,7 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
     low_confidence_objects = [i for i in ingredients if i.get("confidence") != "high"]
 
     try:
+        yield {"stage": "second_pass", "message": "Revisiting uncertain items..."}
         for obj in low_confidence_objects:
             bbox = obj.get("bounding_box")
             if bbox and all(k in bbox for k in ["xmin", "ymin", "xmax", "ymax"]):
@@ -123,8 +130,6 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
                 )
             )
 
-            print(f"Second pass response: {response.text}")
-
             rechecked_ingredients = json.loads(response.text)
 
             if not isinstance(rechecked_ingredients, list):
@@ -132,8 +137,7 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
 
             final_ingredients.extend(rechecked_ingredients)
 
-        print(f"Final ingredients: {final_ingredients}")
-        print("Second pass completed.")
+        yield {"stage": "second_pass_completed", "message": f"Annotating image..."}
 
         annotated_image = draw_bounding_boxes(image_bytes, final_ingredients, img_width, img_height)
 
@@ -143,17 +147,21 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
         with open("output/annotated_image.jpg", "wb") as f:
             f.write(base64.b64decode(annotated_image))
 
-        return {
-            'image': annotated_image,
-            'ingredients': [
+        yield {
+            "stage": "done",
+            "message": "Detection complete",
+            "image": annotated_image,
+            "ingredients": [
                 {
-                'name': ingredient['name'],
-                'quantity': ingredient['quantity'],
-                'condition': ingredient['condition']
-                } 
-            for ingredient in final_ingredients]}
+                    "name": i["name"],
+                    "quantity": i["quantity"],
+                    "condition": i["condition"]
+                }
+                for i in final_ingredients
+            ]
+        }
 
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Error parsing recheck JSON: {e}")
+        yield {"stage": "error", "message": f"Error parsing recheck JSON: {e}"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error in second pass: {e}")
+        yield {"stage": "error", "message": f"Error in second pass: {e}"}
