@@ -879,19 +879,104 @@ body {
   border: 1px solid var(--line);
   border-radius: var(--radius-soft);
   background: var(--surface);
-  overflow: auto;
+  overflow: hidden;
   flex: 1 1 auto;
   min-height: 0;
-  max-height: min(94vh, 1400px);
+  max-height: 72vh;
+  display: grid;
+  place-items: center;
 }
 
 .detection-preview-img {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
-  max-height: min(94vh, 1400px);
+  max-width: 100%;
+  max-height: 72vh;
   object-fit: contain;
-  vertical-align: middle;
+}
+
+.detection-preview-stage {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  max-height: 72vh;
+  line-height: 0;
+}
+
+.detection-overlay-box {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  transition: box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.detection-overlay-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #1d9e75;
+  background: rgba(29, 158, 117, 0.95);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.78);
+}
+
+.detection-overlay-dot--high {
+  border-color: #1d9e75;
+  background: rgba(29, 158, 117, 0.95);
+}
+
+.detection-overlay-dot--medium {
+  border-color: #d97706;
+  background: rgba(217, 119, 6, 0.94);
+}
+
+.detection-overlay-dot--low,
+.detection-overlay-dot--unknown {
+  border-color: #b91c1c;
+  background: rgba(185, 28, 28, 0.94);
+}
+
+.detection-overlay-box:hover .detection-overlay-dot {
+  background: #16906a;
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.28);
+}
+
+.detection-overlay-box--active {
+  border: 2px solid #158463;
+  border-radius: 8px;
+  background: rgba(29, 158, 117, 0.14);
+  transform: none;
+  border-color: #158463;
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.22);
+}
+
+.detection-overlay-box--active .detection-overlay-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+}
+
+.detection-overlay-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateY(-105%);
+  white-space: nowrap;
+  background: #1d9e75;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  font-weight: 600;
+  padding: 0.2rem 0.45rem;
 }
 
 .recipe-preview-card {

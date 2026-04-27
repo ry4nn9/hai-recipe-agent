@@ -27,6 +27,8 @@ export default function App() {
   const [error, setError] = useState("");
   /** Base64 JPEG from /detect/ (bounding boxes); shown in phase 2 */
   const [annotatedImageBase64, setAnnotatedImageBase64] = useState(null);
+  /** Normalized overlay boxes for interactive preview. */
+  const [detectionOverlayItems, setDetectionOverlayItems] = useState([]);
   /** Latest SSE event from /detect/ while loading */
   const [detectionProgress, setDetectionProgress] = useState(null);
   const fileInputRef = useRef(null);
@@ -53,6 +55,7 @@ export default function App() {
     setChatInput("");
     setError("");
     setAnnotatedImageBase64(null);
+    setDetectionOverlayItems([]);
     setStage("input");
     setUnlockedStage(0);
     runDetect(file);
@@ -119,6 +122,7 @@ export default function App() {
     setLoadingDetect(true);
     setDetectionProgress({ stage: "reading", message: "Reading image..." });
     setError("");
+    setDetectionOverlayItems([]);
     try {
       const detected = await pantryApi.detectIngredientsStream(file, (ev) => {
         if (ev.stage === "done") return;
@@ -128,6 +132,9 @@ export default function App() {
       setIngredients(list);
       setAnnotatedImageBase64(
         typeof detected?.image === "string" ? detected.image : null
+      );
+      setDetectionOverlayItems(
+        Array.isArray(detected?.overlayItems) ? detected.overlayItems : []
       );
       setUnlockedStage(1);
       setStage("synthesis");
@@ -243,6 +250,7 @@ export default function App() {
               fileName={selectedImage?.name}
               ingredients={ingredients}
               annotatedImageBase64={annotatedImageBase64}
+              detectionOverlayItems={detectionOverlayItems}
               recipes={recipes}
               previewRecipe={previewRecipe}
               selectedRecipe={selectedRecipe}

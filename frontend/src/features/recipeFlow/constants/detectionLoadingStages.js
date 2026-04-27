@@ -1,24 +1,34 @@
 /**
- * UI steps for the detection progress strip (5 dots / bar segments).
- * Maps server `stage` keys from `/detect/` SSE to a 0-based index.
+ * Ordered stage list from backend SSE stream. Each stage has a
+ * user-facing label for the loading panel.
  */
-const SERVER_STAGE_TO_UI_INDEX = {
-  reading: 0,
-  detecting: 1,
-  detected: 1,
-  first_pass: 2,
-  first_pass_completed: 2,
-  second_pass: 3,
-  second_pass_completed: 3,
-  done: 4,
-};
+export const DETECTION_PIPELINE_STAGES = [
+  { key: "reading", label: "Reading image" },
+  { key: "detecting", label: "Running object detection" },
+  { key: "detected", label: "Objects detected" },
+  { key: "first_pass", label: "Identifying ingredients" },
+  { key: "first_pass_completed", label: "Ingredient pass complete" },
+  { key: "second_pass", label: "Rechecking uncertain items" },
+  { key: "second_pass_completed", label: "Annotating image" },
+  { key: "done", label: "Detection complete" },
+];
+
+const SERVER_STAGE_TO_UI_INDEX = DETECTION_PIPELINE_STAGES.reduce((acc, stage, index) => {
+  acc[stage.key] = index;
+  return acc;
+}, {});
 
 /** How many UI steps the progress bar uses (matches dot count). */
-export const DETECTION_UI_STEP_COUNT = 5;
+export const DETECTION_UI_STEP_COUNT = DETECTION_PIPELINE_STAGES.length;
 
 export function serverStageToUiIndex(stageKey) {
   if (stageKey != null && Object.prototype.hasOwnProperty.call(SERVER_STAGE_TO_UI_INDEX, stageKey)) {
     return SERVER_STAGE_TO_UI_INDEX[stageKey];
   }
   return 0;
+}
+
+export function serverStageToLabel(stageKey) {
+  const stage = DETECTION_PIPELINE_STAGES.find((item) => item.key === stageKey);
+  return stage ? stage.label : "Processing";
 }

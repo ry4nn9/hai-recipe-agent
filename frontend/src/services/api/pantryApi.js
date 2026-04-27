@@ -44,11 +44,14 @@ async function detectIngredientsStream(imageFile, onEvent) {
     if (!trimmed.startsWith(prefix)) return;
     const jsonText = trimmed.slice(prefix.length).trim();
     if (!jsonText) return;
+    let parsed;
     try {
-      handleEvent(JSON.parse(jsonText));
+      parsed = JSON.parse(jsonText);
     } catch {
       /* ignore malformed chunk */
+      return;
     }
+    handleEvent(parsed);
   };
 
   const consumeBlocks = (text) => {
@@ -85,6 +88,7 @@ async function detectIngredientsStream(imageFile, onEvent) {
   return {
     image: donePayload.image,
     ingredients: Array.isArray(donePayload.ingredients) ? donePayload.ingredients : [],
+    overlayItems: Array.isArray(donePayload.overlay_items) ? donePayload.overlay_items : [],
   };
 }
 

@@ -10,7 +10,6 @@ For each ingredient return:
 - "bounding_box": object — normalized coordinates between 0 and 1: {"xmin": float, "ymin": float, "xmax": float, "ymax": float}
   * If the ingredient matches something in the detected objects list, use those coordinates
   * If the ingredient is visible in the image but NOT in the detected objects list, estimate the bounding box yourself based on where you see it in the image
-  * Only return null if you genuinely cannot locate the item in the image
 
 Rules:
 - Use the image as your primary source of truth — if the detected objects list seems wrong or incomplete, trust what you can see in the image

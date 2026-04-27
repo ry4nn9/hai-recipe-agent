@@ -1,6 +1,6 @@
-import base64
 import io
 import json
+import base64
 from sahi import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
 from PIL import Image as PILImage
@@ -9,7 +9,7 @@ from google.genai import types
 from fastapi import UploadFile, File, HTTPException
 from dotenv import load_dotenv
 import os
-from services.image_utils import preprocess_image, crop_image, draw_bounding_boxes
+from services.image_utils import draw_bounding_boxes, preprocess_image, crop_image
 
 load_dotenv("../.env")
 
@@ -29,8 +29,8 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
     # Read the image file
     try:
         image_bytes = await image_file.read()
-        image_bytes = preprocess_image(image_bytes)
-        pil_image = PILImage.open(io.BytesIO(image_bytes))
+        image_processed = preprocess_image(image_bytes)
+        pil_image = PILImage.open(io.BytesIO(image_processed))
         img_width, img_height = pil_image.size
         yield {"stage": "reading", "message": "Reading image..."}
     except Exception as e:
@@ -59,10 +59,10 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
                 "name": object.category.name,
                 "score": round(object.score.value, 3),
                 "box": {
-                    "xmin": bounding_box.minx / img_width,
-                    "ymin": bounding_box.miny / img_height,
-                    "xmax": bounding_box.maxx / img_width,
-                    "ymax": bounding_box.maxy / img_height
+                    "xmin": (bounding_box.minx / img_width),
+                    "ymin": (bounding_box.miny / img_height),
+                    "xmax": (bounding_box.maxx / img_width),
+                    "ymax": (bounding_box.maxy / img_height)
                 }
             })
 
@@ -75,7 +75,6 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
     # Generate content using Gemini (first pass)
     try:
         yield {"stage": "first_pass", "message": "Identifying ingredients..."}
-        image_processed = preprocess_image(image_bytes)
 
         response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
@@ -90,6 +89,10 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
 
         ingredients = json.loads(response.text)
 
+        annotated_image = draw_bounding_boxes(image_processed, ingredients, img_width, img_height)
+        with open("output/annotated_image.jpg", "wb") as f:
+            f.write(base64.b64decode(annotated_image))
+
         yield {"stage": "first_pass_completed", "message": f"Identified {len(ingredients)} ingredients."}
 
     except json.JSONDecodeError as e:
@@ -102,7 +105,6 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
     # Revisit for low confidence objects (second pass)
     contents = []
     final_ingredients = [i for i in ingredients if i.get("confidence") == "high"]
-
     low_confidence_objects = [i for i in ingredients if i.get("confidence") != "high"]
 
     try:
@@ -121,6 +123,8 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
                 types.Part.from_text(text=f"Initial detection: {json.dumps(obj)}")
             )
 
+        print(contents)
+
         if contents:
             response = gemini_client.models.generate_content(
                 model="gemini-2.5-flash",
@@ -137,20 +141,37 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
 
             final_ingredients.extend(rechecked_ingredients)
 
-        yield {"stage": "second_pass_completed", "message": f"Annotating image..."}
+        yield {"stage": "second_pass_completed", "message": "Preparing interactive preview..."}
 
-        annotated_image = draw_bounding_boxes(image_bytes, final_ingredients, img_width, img_height)
+        preview_image = base64.b64encode(image_processed).decode("utf-8")
+        overlay_items = []
+        for i in final_ingredients:
+            bbox = i.get("bounding_box")
+            if not bbox:
+                continue
+            if not all(k in bbox for k in ["xmin", "ymin", "xmax", "ymax"]):
+                continue
+            overlay_items.append(
+                {
+                    "name": i.get("name", "Unknown"),
+                    "confidence": i.get("confidence", "unknown"),
+                    "bounding_box": {
+                        "xmin": float(bbox["xmin"]),
+                        "ymin": float(bbox["ymin"]),
+                        "xmax": float(bbox["xmax"]),
+                        "ymax": float(bbox["ymax"]),
+                    },
+                }
+            )
 
         with open("output/output.txt", "w") as f:
             f.write("\n".join([i["name"] for i in final_ingredients]))
 
-        with open("output/annotated_image.jpg", "wb") as f:
-            f.write(base64.b64decode(annotated_image))
-
         yield {
             "stage": "done",
             "message": "Detection complete",
-            "image": annotated_image,
+            "image": preview_image,
+            "overlay_items": overlay_items,
             "ingredients": [
                 {
                     "name": i["name"],

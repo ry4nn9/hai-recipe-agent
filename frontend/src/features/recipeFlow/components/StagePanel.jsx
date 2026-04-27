@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, Loader2, Plus, Trash2, Zap } from "lucide-react";
 import MotionButton from "../../../components/MotionButton.jsx";
-import { DETECTION_UI_STEP_COUNT, serverStageToUiIndex } from "../constants/detectionLoadingStages";
+import {
+  DETECTION_UI_STEP_COUNT,
+  serverStageToLabel,
+  serverStageToUiIndex,
+} from "../constants/detectionLoadingStages";
 import { STAGES, STAGE_COPY } from "../constants/stages";
 
 const chipSpring = { type: "spring", stiffness: 480, damping: 26 };
@@ -26,6 +30,7 @@ export default function StagePanel({
   fileName,
   ingredients,
   annotatedImageBase64,
+  detectionOverlayItems,
   recipes,
   selectedRecipe,
   chatMessages,
@@ -53,10 +58,15 @@ export default function StagePanel({
   chatStackRef,
 }) {
   const [detectionPreviewOpen, setDetectionPreviewOpen] = useState(false);
+  const [activeOverlayIndex, setActiveOverlayIndex] = useState(null);
 
   useEffect(() => {
     if (!annotatedImageBase64) setDetectionPreviewOpen(false);
   }, [annotatedImageBase64]);
+
+  useEffect(() => {
+    setActiveOverlayIndex(null);
+  }, [detectionOverlayItems, detectionPreviewOpen]);
 
   const detectUiStep =
     loadingDetect && detectionProgress
@@ -65,6 +75,8 @@ export default function StagePanel({
   /** Same string as the stream event `message` field (see vision.py). */
   const detectStageMessage =
     loadingDetect && detectionProgress ? detectionProgress.message : "";
+  const detectStageLabel =
+    loadingDetect && detectionProgress ? serverStageToLabel(detectionProgress.stage) : "";
 
   const content = STAGE_COPY[stage];
   const phaseNumber = STAGES.findIndex((stageItem) => stageItem.id === stage) + 1;
@@ -162,6 +174,9 @@ export default function StagePanel({
                     exit={{ opacity: 0, y: -6 }}
                     transition={detectStageTransition}
                   >
+                    <p className="micro-label">
+                      {`STEP ${Math.min(detectUiStep + 1, DETECTION_UI_STEP_COUNT)} / ${DETECTION_UI_STEP_COUNT} · ${detectStageLabel}`}
+                    </p>
                     <p className="detection-loading-title">{detectStageMessage}</p>
                   </motion.div>
                 </AnimatePresence>
@@ -306,12 +321,69 @@ export default function StagePanel({
                     DETECTION PREVIEW
                   </p>
                   <div className="detection-preview-frame">
-                    <img
-                      src={`data:image/jpeg;base64,${annotatedImageBase64}`}
-                      alt="Pantry photo with detected ingredients highlighted"
-                      className="detection-preview-img"
-                    />
+                    <div className="detection-preview-stage">
+                      <img
+                        src={`data:image/jpeg;base64,${annotatedImageBase64}`}
+                        alt="Pantry photo with interactive ingredient overlays"
+                        className="detection-preview-img"
+                      />
+                      {detectionOverlayItems.map((item, idx) => {
+                        const bbox = item?.bounding_box;
+                        if (!bbox) return null;
+                        const isActive = activeOverlayIndex === idx;
+                        const confidence = (item.confidence || "unknown").toLowerCase();
+                        const centerX = ((Math.max(0, bbox.xmin) + Math.min(1, bbox.xmax)) / 2) * 100;
+                        const centerY = ((Math.max(0, bbox.ymin) + Math.min(1, bbox.ymax)) / 2) * 100;
+                        const width = Math.max(0, bbox.xmax - bbox.xmin) * 100;
+                        const height = Math.max(0, bbox.ymax - bbox.ymin) * 100;
+                        const label = `${item.name || "Unknown"} (${item.confidence || "unknown"})`;
+                        return (
+                          <button
+                            key={`${item.name || "item"}-${idx}`}
+                            type="button"
+                            className={`detection-overlay-box${isActive ? " detection-overlay-box--active" : ""}`}
+                            style={
+                              isActive
+                                ? {
+                                    left: `${Math.max(0, bbox.xmin) * 100}%`,
+                                    top: `${Math.max(0, bbox.ymin) * 100}%`,
+                                    width: `${width}%`,
+                                    height: `${height}%`,
+                                  }
+                                : {
+                                    left: `${centerX}%`,
+                                    top: `${centerY}%`,
+                                  }
+                            }
+                            onMouseEnter={() => setActiveOverlayIndex(idx)}
+                            onMouseLeave={() => setActiveOverlayIndex((prev) => (prev === idx ? null : prev))}
+                            onFocus={() => setActiveOverlayIndex(idx)}
+                            onBlur={() => setActiveOverlayIndex((prev) => (prev === idx ? null : prev))}
+                            title={label}
+                            aria-label={label}
+                          >
+                            <span
+                              className={`detection-overlay-dot detection-overlay-dot--${confidence}`}
+                              aria-hidden="true"
+                            />
+                            {isActive ? (
+                              <span className="detection-overlay-label">
+                                {item.name || "Unknown"} - {item.confidence || "unknown"}
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+                  {activeOverlayIndex != null && detectionOverlayItems[activeOverlayIndex] ? (
+                    <p className="hint-text">
+                      Selected: {detectionOverlayItems[activeOverlayIndex].name} (
+                      {detectionOverlayItems[activeOverlayIndex].confidence || "unknown"})
+                    </p>
+                  ) : (
+                    <p className="hint-text">Hover over a dot to inspect a detected ingredient.</p>
+                  )}
                   <MotionButton type="button" className="action-button" onClick={() => setDetectionPreviewOpen(false)}>
                     Close
                   </MotionButton>
