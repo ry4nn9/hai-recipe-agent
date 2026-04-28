@@ -10,6 +10,47 @@ import {
 } from "./features/recipeFlow";
 import { pantryApi } from "./services/api/pantryApi";
 
+async function convertToRgbUpload(file) {
+  const imageUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Unable to decode selected image."));
+      img.src = imageUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Canvas context unavailable.");
+    }
+    // Drawing onto a canvas normalizes source pixels to RGB.
+    ctx.drawImage(image, 0, 0);
+
+    const jpegBlob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Failed to encode image as JPEG."));
+            return;
+          }
+          resolve(blob);
+        },
+        "image/jpeg",
+        0.92
+      );
+    });
+
+    const rgbFileName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([jpegBlob], rgbFileName, { type: "image/jpeg" });
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
 export default function App() {
   const [stage, setStage] = useState("input");
   const [unlockedStage, setUnlockedStage] = useState(0);
@@ -42,9 +83,18 @@ export default function App() {
     fileInputRef.current?.click();
   };
 
-  const handleImageSelect = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleImageSelect = async (event) => {
+    const sourceFile = event.target.files?.[0];
+    if (!sourceFile) return;
+
+    let file = sourceFile;
+    try {
+      file = await convertToRgbUpload(sourceFile);
+    } catch (e) {
+      setError(`Upload conversion failed: ${e.message}`);
+      return;
+    }
+
     setSelectedImage(file);
     setIngredients([]);
     setRecipes([]);
