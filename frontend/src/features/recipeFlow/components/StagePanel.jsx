@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, Loader2, Plus, Trash2, Zap } from "lucide-react";
 import MotionButton from "../../../components/MotionButton.jsx";
+import InfoTooltip from "../../../components/InfoTooltip.jsx";
 import {
   DETECTION_UI_STEP_COUNT,
   serverStageToLabel,
@@ -34,6 +35,7 @@ export default function StagePanel({
   recipes,
   selectedRecipe,
   chatMessages,
+  chatHistories,
   chatInput,
   activeIngredient,
   loadingDetect,
@@ -92,8 +94,10 @@ export default function StagePanel({
     >
       <div className="stage-head">
         <p className="micro-label">{`PHASE 0${phaseNumber}`}</p>
-        <h2>{content.title}</h2>
-        <p>{content.subtitle}</p>
+        <div className="stage-title-row">
+          <h2>{content.title}</h2>
+          <InfoTooltip text={content.subtitle} />
+        </div>
       </div>
 
       {stage === "input" && (
@@ -198,14 +202,21 @@ export default function StagePanel({
                       <motion.button
                         key={`${recipe.title}-${idx}`}
                         type="button"
-                        className="recipe-option-card motion-recipe-card"
+                        className={`recipe-option-card motion-recipe-card${idx === 0 ? " recipe-option-card--best" : ""}`}
                         onClick={() => onPreviewRecipe(recipe)}
                         whileHover={{ scale: 1.02, y: -3 }}
                         whileTap={{ scale: 0.98 }}
                         transition={chipSpring}
                       >
                         <span className="recipe-option-main">
-                          <span className="recipe-option-title">{recipe.title}</span>
+                          <span className="recipe-option-title">
+                            {recipe.title}
+                            {idx === 0 && (
+                              <span className="best-match-badge" aria-label="Best match">
+                                ★ Michelin's Pick
+                              </span>
+                            )}
+                          </span>
                         </span>
                         <span className="recipe-option-meta">
                           <span>{recipe.prep_time || "Time n/a"}</span>
@@ -224,12 +235,10 @@ export default function StagePanel({
 
               {annotatedImageBase64 ? (
                 <section className="synthesis-panel-section" aria-labelledby="synthesis-detection-heading">
-                  <p className="micro-label" id="synthesis-detection-heading">
-                    DETECTION
-                  </p>
-                  <p className="hint-text synthesis-section-hint">
-                    Open the annotated image to see how items were located on your photo.
-                  </p>
+                  <div className="section-label-row">
+                    <p className="micro-label" id="synthesis-detection-heading">DETECTION</p>
+                    <InfoTooltip text="Open the annotated image to see how items were located on your photo." />
+                  </div>
                   <MotionButton
                     type="button"
                     className="action-button action-button-secondary synthesis-preview-open-btn"
@@ -278,17 +287,27 @@ export default function StagePanel({
                   </MotionButton>
                   <MotionButton
                     type="button"
-                    className="action-button synthesis-generate-btn"
+                    className={`action-button synthesis-generate-btn${loadingRecipes ? " synthesis-generate-btn--loading" : ""}`}
                     onClick={onRunRecipes}
                     disabled={!ingredients.length || loadingRecipes}
                     aria-busy={loadingRecipes}
                   >
                     {loadingRecipes ? (
-                      <Loader2 className="processing-icon loader-spin" strokeWidth={2} aria-hidden="true" />
+                      <>
+                        <span className="brainstorm-wave" aria-hidden="true">
+                          {[0,1,2].map(i => <span key={i} className="brainstorm-bar" style={{ animationDelay: `${i * 0.15}s` }} />)}
+                        </span>
+                        Generating
+                        <span className="brainstorm-ellipsis" aria-hidden="true">
+                          {[0,1,2].map(i => <span key={i} style={{ animationDelay: `${i * 0.18}s` }}>.</span>)}
+                        </span>
+                      </>
                     ) : (
-                      <Zap className="processing-icon icon-inactive" strokeWidth={1.5} aria-hidden="true" />
+                      <>
+                        <Zap className="processing-icon icon-inactive" strokeWidth={1.5} aria-hidden="true" />
+                        Brainstorm
+                      </>
                     )}
-                    {loadingRecipes ? "Generating…" : "Brainstorm"}
                   </MotionButton>
                 </div>
               </section>
@@ -564,7 +583,28 @@ export default function StagePanel({
             </article>
           ) : (
             <div className="chat-shell">
-              <p className="micro-label">COOKING GUIDE</p>
+              {/* Recipe chat switcher — only shown when more than one chat exists */}
+              {Object.keys(chatHistories).length > 1 && (
+                <div className="chat-switcher" role="tablist" aria-label="Recipe chats">
+                  {Object.keys(chatHistories).map((title) => {
+                    const isActive = selectedRecipe?.title === title;
+                    const recipe = recipes.find((r) => r.title === title);
+                    return (
+                      <button
+                        key={title}
+                        type="button"
+                        role="tab"
+                        aria-selected={isActive}
+                        className={`chat-switcher-tab${isActive ? " is-active" : ""}`}
+                        onClick={() => recipe && onSelectRecipe(recipe)}
+                      >
+                        {title}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="micro-label">MICHELIN</p>
               <div className="chat-stack" ref={chatStackRef}>
                 {chatMessages.map((bubble, idx) => (
                   <article
@@ -576,12 +616,13 @@ export default function StagePanel({
                   </article>
                 ))}
                 {loadingChat ? (
-                  <article className="chat-bubble agent">
+                  <article className="chat-bubble agent chat-bubble--thinking">
                     <p className="micro-label">AGENT</p>
-                    <p>
-                      <Zap className="processing-icon icon-active" strokeWidth={1.5} aria-hidden="true" />
-                      Thinking through the next cooking step...
-                    </p>
+                    <span className="thinking-dots" aria-label="Thinking">
+                      {[0,1,2].map(i => (
+                        <span key={i} className="thinking-dot" style={{ animationDelay: `${i * 0.18}s` }} />
+                      ))}
+                    </span>
                   </article>
                 ) : null}
               </div>
@@ -589,7 +630,7 @@ export default function StagePanel({
                 <input
                   value={chatInput}
                   onChange={onChatInputChange}
-                  placeholder="Tell the agent what step you are on..."
+                  placeholder="Tell Michelin what step you are on..."
                 />
                 <MotionButton
                   type="submit"

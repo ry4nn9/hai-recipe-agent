@@ -9,6 +9,7 @@ import {
   getRecipeMaterials,
 } from "./features/recipeFlow";
 import { pantryApi } from "./services/api/pantryApi";
+import ThemeToggle from "./components/ThemeToggle";
 
 async function convertToRgbUpload(file) {
   const imageUrl = URL.createObjectURL(file);
@@ -60,7 +61,8 @@ export default function App() {
   const [previewRecipe, setPreviewRecipe] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [activeIngredient, setActiveIngredient] = useState(null);
-  const [chatMessages, setChatMessages] = useState([]);
+  // Per-recipe chat histories keyed by recipe title
+  const [chatHistories, setChatHistories] = useState({});
   const [chatInput, setChatInput] = useState("");
   const [loadingDetect, setLoadingDetect] = useState(false);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
@@ -76,6 +78,9 @@ export default function App() {
   const chatStackRef = useRef(null);
 
   const materials = useMemo(() => getRecipeMaterials(selectedRecipe), [selectedRecipe]);
+
+  // Chat messages for the currently selected recipe
+  const chatMessages = selectedRecipe ? (chatHistories[selectedRecipe.title] ?? []) : [];
 
   const showSidebar = useMemo(() => stage === "execution", [stage]);
 
@@ -101,7 +106,7 @@ export default function App() {
     setPreviewRecipe(null);
     setSelectedRecipe(null);
     setActiveIngredient(null);
-    setChatMessages([]);
+    setChatHistories({});
     setChatInput("");
     setError("");
     setAnnotatedImageBase64(null);
@@ -219,12 +224,19 @@ export default function App() {
     setSelectedRecipe(recipe);
     setUnlockedStage(2);
     setStage("execution");
-    setChatMessages([
-      {
-        role: "agent",
-        text: `Great choice. We'll cook "${recipe.title}" one step at a time. Tell me when you're ready to start prep.`,
-      },
-    ]);
+    // Only initialise the chat if this recipe has never been opened before
+    setChatHistories((prev) => {
+      if (prev[recipe.title]) return prev;
+      return {
+        ...prev,
+        [recipe.title]: [
+          {
+            role: "agent",
+            text: `Great choice. We'll cook "${recipe.title}" one step at a time. Tell me when you're ready to start prep.`,
+          },
+        ],
+      };
+    });
     setChatInput("");
     setError("");
   };
@@ -234,8 +246,11 @@ export default function App() {
     const message = chatInput.trim();
     if (!message || !selectedRecipe) return;
 
-    const nextHistory = [...chatMessages, { role: "user", text: message }];
-    setChatMessages(nextHistory);
+    const key = selectedRecipe.title;
+    const current = chatHistories[key] ?? [];
+    const nextHistory = [...current, { role: "user", text: message }];
+
+    setChatHistories((prev) => ({ ...prev, [key]: nextHistory }));
     setChatInput("");
     setLoadingChat(true);
     setError("");
@@ -248,13 +263,16 @@ export default function App() {
         message,
       });
 
-      setChatMessages((prev) => [
+      setChatHistories((prev) => ({
         ...prev,
-        {
-          role: "agent",
-          text: response.reply || "Let's continue. What's your current step?",
-        },
-      ]);
+        [key]: [
+          ...(prev[key] ?? []),
+          {
+            role: "agent",
+            text: response.reply || "Let's continue. What's your current step?",
+          },
+        ],
+      }));
     } catch (e) {
       setError(`Guide chat failed: ${e.message}`);
     } finally {
@@ -305,6 +323,7 @@ export default function App() {
               previewRecipe={previewRecipe}
               selectedRecipe={selectedRecipe}
               chatMessages={chatMessages}
+              chatHistories={chatHistories}
               chatInput={chatInput}
               activeIngredient={activeIngredient}
               loadingDetect={loadingDetect}
@@ -333,6 +352,7 @@ export default function App() {
           )}
         </main>
       </div>
+      <ThemeToggle />
     </div>
   );
 }

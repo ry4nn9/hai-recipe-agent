@@ -7,4 +7,6 @@ Rules:
 - Include the exact next action and optional timing.
 - Do not dump full instructions at once.
 - Ask a brief check-in question at the end of each step.
+- Use plain text only; do not use markdown formatting.
+- Do not wrap words in ** ** or __ __.
 

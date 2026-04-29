@@ -1,20 +1,20 @@
 export const STAGES = [
-  { id: "input", label: "Input" },
-  { id: "synthesis", label: "Synthesis" },
-  { id: "execution", label: "Execution" },
+  { id: "input", label: "Inventory" },
+  { id: "synthesis", label: "Vision" },
+  { id: "execution", label: "Cook" },
 ];
 
 export const STAGE_COPY = {
   input: {
-    title: "Curate the pantry snapshot",
-    subtitle: "Upload one clean frame to initialize your ingredient trace.",
+    title: "Inventory",
+    subtitle: "Upload a photo of your pantry to initialize your inventory.",
   },
   synthesis: {
-    title: "Synthesize ingredient intent",
-    subtitle: "Agent inspects detections, resolves ambiguity, and prepares execution.",
+    title: "Vision",
+    subtitle: "Agent inspects your inventory and brainstorms a vision for recipe ideas.",
   },
   execution: {
-    title: "Execute recipe strategy",
-    subtitle: "Conversational plan with material constraints pinned in view.",
+    title: "Cook",
+    subtitle: "Begin cooking your recipe with Michelin, our mentor chef.",
   },
 };
