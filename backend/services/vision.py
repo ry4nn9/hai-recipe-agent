@@ -1,23 +1,22 @@
 import io
 import json
 import base64
-from sahi import AutoDetectionModel
-from sahi.predict import get_sliced_prediction
+from ultralytics import YOLOE
 from PIL import Image as PILImage
 from google import genai
 from google.genai import types
-from fastapi import UploadFile, File, HTTPException
+from fastapi import UploadFile, File
 from dotenv import load_dotenv
 import os
 from services.image_utils import draw_bounding_boxes, preprocess_image, crop_image
+from models.ingredient import IngredientWithBoundingBox
 
 load_dotenv("../.env")
 
-detection_model = AutoDetectionModel.from_pretrained(
-    model_type="ultralytics",
-    model_path="yolov8x.pt",
-    confidence_threshold=0.1,
-)
+yolo_model = YOLOE("yoloe-26l-seg.pt")
+yolo_model.set_classes(["box", "can", "jar", "bowl", "bottle", "vegetable", 
+                        "fruits", "meat", "fish", "egg", "dairy", "bread", 
+                        "pasta", "rice", "beverage", "plant", "herb", "carton"])
 
 gemini_client = genai.Client(
     vertexai=True,
@@ -41,30 +40,31 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
     # Create bounding boxes
     try:
         yield {"stage": "detecting", "message": "Running object detection..."}
-        results = get_sliced_prediction(
-            pil_image,
-            detection_model,
-            slice_height=240,
-            slice_width=240,
-            overlap_height_ratio=0.2,
-            overlap_width_ratio=0.2,
-        )
-
-        results.export_visuals(export_dir="output/", file_name="sahi_annotated")
-
+        
+        results = yolo_model.predict(pil_image, conf=0.01, iou=0.2)
         objects_data = []
-        for object in results.object_prediction_list:
-            bounding_box = object.bbox
-            objects_data.append({
-                "name": object.category.name,
-                "score": round(object.score.value, 3),
-                "box": {
-                    "xmin": (bounding_box.minx / img_width),
-                    "ymin": (bounding_box.miny / img_height),
-                    "xmax": (bounding_box.maxx / img_width),
-                    "ymax": (bounding_box.maxy / img_height)
-                }
-            })
+        for r in results:
+            # get normalizedbbox, confidence, and class ID
+            boxes = r.boxes.xyxyn  
+            confs = r.boxes.conf   
+            clss = r.boxes.cls    
+
+            for i in range(len(boxes)):
+                objects_data.append({
+                    "name": r.names[int(clss[i])], 
+                    "confidence": round(float(confs[i]), 3),
+                    "bounding_box": {
+                        "xmin": float(boxes[i][0]),
+                        "ymin": float(boxes[i][1]),
+                        "xmax": float(boxes[i][2]),
+                        "ymax": float(boxes[i][3])
+                    }
+                })
+
+        # draw bounding boxes on the image
+        annotated_image = draw_bounding_boxes(image_processed, objects_data, img_width, img_height)
+        with open("output/yolo_annotated_image.jpg", "wb") as f:
+            f.write(base64.b64decode(annotated_image))
 
         yield {"stage": "detected", "message": f"Found {len(objects_data)} objects."}
 
@@ -84,10 +84,13 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
             ],
             config=types.GenerateContentConfig(
                 system_instruction=open("prompts/first_pass.txt").read(),
-            )
+                response_mime_type="application/json", response_schema=list[IngredientWithBoundingBox]
+            ),
         )
 
         ingredients = json.loads(response.text)
+        if isinstance(ingredients, dict):
+            ingredients = [ingredients]
 
         annotated_image = draw_bounding_boxes(image_processed, ingredients, img_width, img_height)
         with open("output/annotated_image.jpg", "wb") as f:
@@ -123,14 +126,13 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
                 types.Part.from_text(text=f"Initial detection: {json.dumps(obj)}")
             )
 
-        print(contents)
-
         if contents:
             response = gemini_client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=contents,
                 config=types.GenerateContentConfig(
                     system_instruction=open("prompts/second_pass.txt").read(),
+                    response_mime_type="application/json", response_schema=list[IngredientWithBoundingBox]
                 )
             )
 
@@ -164,8 +166,10 @@ async def detect_ingredients_from_image(image_file: UploadFile = File(...)):
                 }
             )
 
-        with open("output/output.txt", "w") as f:
-            f.write("\n".join([i["name"] for i in final_ingredients]))
+        # draw bounding boxes on the image
+        annotated_image = draw_bounding_boxes(image_processed, final_ingredients, img_width, img_height)
+        with open("output/final_annotated_image.jpg", "wb") as f:
+            f.write(base64.b64decode(annotated_image))
 
         yield {
             "stage": "done",
